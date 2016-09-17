@@ -6,12 +6,12 @@ number_of_rep <- 10
 min_threshold <- 0.005
 offset <- 3
 selected_cols <- c("somac", "di", "bi", "him", "m", "thang", "nam", "hil", "ci", "ad", "nd")
-first_layer_nodes = floor(length(selected_cols) * 3 / 2)
+first_layer_nodes = floor((length(selected_cols) - 2) * 3 / 2)
 second_layer_nodes = floor(first_layer_nodes / 2)
 
 saveOrUpdateNeuralNetwork <- function() {
 	#create table if not exist
-	dbGetQuery(con, "CREATE TABLE IF NOT EXISTS ytdp_neural_network (tham_so text NOT NULL, diemdo integer NOT NULL, layer_nodes text, first_layer_weights text, second_layer_weights text)")
+	dbGetQuery(con, "CREATE TABLE IF NOT EXISTS ytdp_neural_network (model_type text NOT NULL, tham_so text NOT NULL, diemdo integer NOT NULL, layer_nodes text, first_layer_weights text, second_layer_weights text)")
 	
 	# generate tham so
 	tham_so = toString(names(df_predict))
@@ -23,9 +23,9 @@ saveOrUpdateNeuralNetwork <- function() {
 	second_layer_weights = toString(weights[[2]])
 	
 	#save to db	
-	existsSQL <- sprintf("SELECT EXISTS(SELECT 1 FROM ytdp_neural_network WHERE diemdo = %d)", diem)
-	insertSQL <- sprintf("INSERT INTO ytdp_neural_network (tham_so, diemdo, layer_nodes, first_layer_weights, second_layer_weights) VALUES ('%s', %d, '%s', '%s', '%s');", tham_so, diem, layer_nodes, first_layer_weights, second_layer_weights)
-	updateSQL <- sprintf("UPDATE ytdp_neural_network SET tham_so = '%s', layer_nodes = '%s', first_layer_weights = '%s', second_layer_weights = '%s' WHERE diemdo = %d;", tham_so, layer_nodes, first_layer_weights, second_layer_weights, diem)
+	existsSQL <- sprintf("SELECT EXISTS(SELECT 1 FROM ytdp_neural_network WHERE diemdo = %d AND model_type = '%s')", diem, model_type)
+	insertSQL <- sprintf("INSERT INTO ytdp_neural_network (model_type, tham_so, diemdo, layer_nodes, first_layer_weights, second_layer_weights) VALUES ('%s', '%s', %d, '%s', '%s', '%s');", model_type, tham_so, diem, layer_nodes, first_layer_weights, second_layer_weights)
+	updateSQL <- sprintf("UPDATE ytdp_neural_network SET tham_so = '%s', layer_nodes = '%s', first_layer_weights = '%s', second_layer_weights = '%s' WHERE diemdo = %d AND model_type = '%s';", tham_so, layer_nodes, first_layer_weights, second_layer_weights, diem, model_type)
 	#save or update predicted values
 	saveOrUpdate(existsSQL, insertSQL, updateSQL)
 }
@@ -47,8 +47,8 @@ calculatePredictData <- function() {
 		updateSQL <- sprintf("UPDATE ytdp_prediction SET sm_du_bao = %e WHERE thang = %d AND nam = %d AND diemdo = %d AND phuong_phap = '%s';", predict, predict_month, predict_year, diem, model_type)
 		#save or update predicted values
 		saveOrUpdate(existsSQL, insertSQL, updateSQL)
-		saveOrUpdateNeuralNetwork()
 	}
+	saveOrUpdateNeuralNetwork()
 }
 
 createDataframe <- function(df) {

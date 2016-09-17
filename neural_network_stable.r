@@ -2,9 +2,11 @@ require("neuralnet")
 source("db.R")
 
 model_type <- "NEURAL_NETWORK"
-number_of_rep <- 30
-min_threshold <- 0.001
-selected_cols <- c("somac", "di", "bi", "him", "m", "ci", "hil", "nd", "thang", "nam")
+number_of_rep <- 10
+min_threshold <- 0.005
+selected_cols <- c("somac", "di", "bi", "him", "m", "thang", "nam", "hil", "ci", "ad", "nd")
+first_layer_nodes = floor((length(selected_cols) - 3) / 2)
+second_layer_nodes = floor(first_layer_nodes / 2)
 
 calculatePredictData <- function() {
 	for(i in length(predict.nn_):1){
@@ -24,42 +26,32 @@ calculatePredictData <- function() {
 		#save or update predicted values
 		saveOrUpdate(existsSQL, insertSQL, updateSQL)
 	}
+	saveOrUpdateNeuralNetwork()
 }
 
 saveOrUpdateNeuralNetwork <- function() {
 	#create table if not exist
-	#dbGetQuery(con, "CREATE TABLE IF NOT EXISTS public.ytdp_neural_network(id integer NOT NULL DEFAULT nextval('ytdp_neural_network_id_seq'::regclass), tham_so character varying(256) NOT NULL, diemdo integer NOT NULL, node11 character varying(256), node12 character varying(256), node13 character varying(256), node14 character varying(256), node15 character varying(256), node21 character varying(256), CONSTRAINT ytdp_neural_network_pkey PRIMARY KEY (id), CONSTRAINT ytdp_neural_network_diemdo_fkey FOREIGN KEY (diemdo) REFERENCES public.ytdp_diaphuong (id) MATCH SIMPLE ON UPDATE NO ACTION ON DELETE SET NULL)WITH (OIDS=FALSE); ALTER TABLE public.ytdp_neural_network OWNER TO postgres; COMMENT ON TABLE public.ytdp_neural_network IS 'ytdp.neural_network'; COMMENT ON COLUMN public.ytdp_neural_network.tham_so IS 'Tham so'; COMMENT ON COLUMN public.ytdp_neural_network.node11 IS 'Node 11'; COMMENT ON COLUMN public.ytdp_neural_network.node12 IS 'Node 12'; COMMENT ON COLUMN public.ytdp_neural_network.node13 IS 'Node 13'; COMMENT ON COLUMN public.ytdp_neural_network.node14 IS 'Node 14'; COMMENT ON COLUMN public.ytdp_neural_network.node15 IS 'Node 15'; COMMENT ON COLUMN public.ytdp_neural_network.node21 IS 'Node 21'; COMMENT ON COLUMN public.ytdp_neural_network.diemdo IS 'Điểm đo';")
+	dbGetQuery(con, "CREATE TABLE IF NOT EXISTS ytdp_neural_network (model_type text NOT NULL, tham_so text NOT NULL, diemdo integer NOT NULL, layer_nodes text, first_layer_weights text, second_layer_weights text)")
 	
 	# generate tham so
-	remove <- c("somac","thang","nam")
-	vector_tham_so <- setdiff(selected_cols, remove)
-	tham_so <- toString(vector_tham_so)
+	tham_so = toString(n[!n %in% "somac"])
 	
 	#generate node data
-	node11 <- toString(nn$weights[[min_rep]][[1]][,1])
-	node12 <- toString(nn$weights[[min_rep]][[1]][,2])
-	node13 <- toString(nn$weights[[min_rep]][[1]][,3])
-	node14 <- toString(nn$weights[[min_rep]][[1]][,4])
-	node15 <- toString(nn$weights[[min_rep]][[1]][,5])
-	node21 <- toString(nn$weights[[min_rep]][[2]][,1])
+	weights = lapply(nn$weights[[min_rep]], round, 3)
+	layer_nodes = toString(c(first_layer_nodes, second_layer_nodes))
+	first_layer_weights = toString(weights[[1]])
+	second_layer_weights = toString(weights[[2]])
 	
 	#save to db	
-	existsSQL <- sprintf("SELECT EXISTS(SELECT 1 FROM ytdp_neural_network WHERE diemdo = %d)", diem)
-	insertSQL <- sprintf("INSERT INTO ytdp_neural_network (tham_so, diemdo, node11, node12, node13, node14, node15, node21) VALUES ('%s', %d, '%s', '%s', '%s', '%s', '%s', '%s');", tham_so, diem, node11, node12, node13, node14, node15, node21)
-	updateSQL <- sprintf("UPDATE ytdp_neural_network SET tham_so = '%s', node11 = '%s', node12 = '%s', node13 = '%s', node14 = '%s', node15 = '%s', node21 = '%s' WHERE diemdo = %d;", tham_so, node11, node12, node13, node14, node15, node21, diem)
+	existsSQL <- sprintf("SELECT EXISTS(SELECT 1 FROM ytdp_neural_network WHERE diemdo = %d AND model_type = '%s')", diem, model_type)
+	insertSQL <- sprintf("INSERT INTO ytdp_neural_network (model_type, tham_so, diemdo, layer_nodes, first_layer_weights, second_layer_weights) VALUES ('%s', '%s', %d, '%s', '%s', '%s');", model_type, tham_so, diem, layer_nodes, first_layer_weights, second_layer_weights)
+	updateSQL <- sprintf("UPDATE ytdp_neural_network SET tham_so = '%s', layer_nodes = '%s', first_layer_weights = '%s', second_layer_weights = '%s' WHERE diemdo = %d AND model_type = '%s';", tham_so, layer_nodes, first_layer_weights, second_layer_weights, diem, model_type)
 	#save or update predicted values
 	saveOrUpdate(existsSQL, insertSQL, updateSQL)
 }
 
 # loop through diemdo, subset diemdo, make correlation for each nam
 for (diem in diemdo) {
-
-	#skip good model
-	good_model_diemdo <- c(12,13,15,16,17,20)
-	if (diem %in% good_model_diemdo) {
-		next
-	}
-
 	sub_df_diem <- subset(df_postgres, diemdo == diem, select = selected_cols)	
 	
 	# get data for prediction
@@ -75,8 +67,7 @@ for (diem in diemdo) {
 	#calculate model
 	n <- names(scaled)
 	f <- as.formula(paste("somac ~", paste(n[!n %in% "somac"], collapse = " + ")))
-	number_of_nodes <- floor(length(selected_cols) / 2)
-	nn <- neuralnet(f, data=scaled, hidden=c(number_of_nodes), rep=number_of_rep, threshold = min_threshold)
+	nn <- neuralnet(f, data=scaled, hidden=c(first_layer_nodes, second_layer_nodes), rep=number_of_rep, threshold = min_threshold)
 	
 	#predict
 	#tuong tu nhu calculate voi test, input la nam truoc do
@@ -96,28 +87,23 @@ for (diem in diemdo) {
 	plot_data <- predict.nn_[,1]
 	
 	#calculate predict data from df_predict
-	sub_df_diem <- subset(df_predict, diemdo == diem, select = selected_cols)
-	sub_df_diem <- sub_df_diem[nrow(sub_df_diem):1,]
-	months <- sub_df_diem$thang
-	years <- sub_df_diem$nam
-	sub_df_diem <- subset(sub_df_diem, select = -c(nam,thang))
+	#sub_df_diem <- subset(df_predict, diemdo == diem, select = selected_cols)
+	#sub_df_diem <- sub_df_diem[nrow(sub_df_diem):1,]
+	#months <- sub_df_diem$thang
+	#years <- sub_df_diem$nam
+	#sub_df_diem <- subset(sub_df_diem, select = -c(nam,thang))
 	
-	scaled <- as.data.frame(scale(sub_df_diem, center = mins, scale = maxs - mins))
-	predict.nn <- compute(nn, scaled[,2:length(sub_df_diem)], rep = min_rep)
-	predict.nn_ <- predict.nn$net.result * (max_somac - min_somac) + min_somac
-	calculatePredictData()
-	plot_data <- append(predict.nn_[,1],plot_data)
+	#scaled <- as.data.frame(scale(sub_df_diem, center = mins, scale = maxs - mins))
+	#predict.nn <- compute(nn, scaled[,2:length(sub_df_diem)], rep = min_rep)
+	#predict.nn_ <- predict.nn$net.result * (max_somac - min_somac) + min_somac
+	#calculatePredictData()
+	#plot_data <- append(predict.nn_[,1],plot_data)
 	
 	print("======================================")
 	
-	# plot nn 12/2014 -> 1/2008
-	png(paste0(diem,".png"))
+	# plot nn 12/2013 -> 1/2008
 	plot_data <- rev(plot_data)
 	plot(plot_data, type='l', col='red')
 	real_data <- rev(subset(df_postgres, diemdo==diem)$somac)
 	lines(real_data, col='blue')
-	dev.off()
-	
-	#save model to DB
-	saveOrUpdateNeuralNetwork()
 }
