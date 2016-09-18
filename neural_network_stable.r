@@ -31,7 +31,7 @@ calculatePredictData <- function() {
 
 saveOrUpdateNeuralNetwork <- function() {
 	#create table if not exist
-	dbGetQuery(con, "CREATE TABLE IF NOT EXISTS ytdp_neural_network (model_type text NOT NULL, tham_so text NOT NULL, diemdo integer NOT NULL, layer_nodes text, first_layer_weights text, second_layer_weights text)")
+	dbGetQuery(con, "CREATE TABLE IF NOT EXISTS ytdp_neural_network (model_type text NOT NULL, tham_so text NOT NULL, diemdo integer NOT NULL, layer_nodes text, weights text)")
 	
 	# generate tham so
 	tham_so = toString(n[!n %in% "somac"])
@@ -39,13 +39,12 @@ saveOrUpdateNeuralNetwork <- function() {
 	#generate node data
 	weights = lapply(nn$weights[[min_rep]], round, 3)
 	layer_nodes = toString(c(first_layer_nodes, second_layer_nodes))
-	first_layer_weights = toString(weights[[1]])
-	second_layer_weights = toString(weights[[2]])
+	weights = toString(gsub("\n","", weights))
 	
 	#save to db	
 	existsSQL <- sprintf("SELECT EXISTS(SELECT 1 FROM ytdp_neural_network WHERE diemdo = %d AND model_type = '%s')", diem, model_type)
-	insertSQL <- sprintf("INSERT INTO ytdp_neural_network (model_type, tham_so, diemdo, layer_nodes, first_layer_weights, second_layer_weights) VALUES ('%s', '%s', %d, '%s', '%s', '%s');", model_type, tham_so, diem, layer_nodes, first_layer_weights, second_layer_weights)
-	updateSQL <- sprintf("UPDATE ytdp_neural_network SET tham_so = '%s', layer_nodes = '%s', first_layer_weights = '%s', second_layer_weights = '%s' WHERE diemdo = %d AND model_type = '%s';", tham_so, layer_nodes, first_layer_weights, second_layer_weights, diem, model_type)
+	insertSQL <- sprintf("INSERT INTO ytdp_neural_network (model_type, tham_so, diemdo, layer_nodes, weights) VALUES ('%s', '%s', %d, '%s', '%s');", model_type, tham_so, diem, layer_nodes, weights)
+	updateSQL <- sprintf("UPDATE ytdp_neural_network SET tham_so = '%s', layer_nodes = '%s', weights = '%s' WHERE diemdo = %d AND model_type = '%s';", tham_so, layer_nodes, weights, diem, model_type)
 	#save or update predicted values
 	saveOrUpdate(existsSQL, insertSQL, updateSQL)
 }
