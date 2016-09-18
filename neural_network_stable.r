@@ -38,7 +38,7 @@ saveOrUpdateNeuralNetwork <- function() {
 	
 	#generate node data
 	weights = lapply(nn$weights[[min_rep]], round, 3)
-	layer_nodes = toString(c(first_layer_nodes, second_layer_nodes))
+	layer_nodes = toString(c(first_layer_nodes, second_layer_nodes, 1))
 	weights = toString(gsub("\n","", weights))
 	
 	#save to db	
