@@ -1,0 +1,9 @@
+source("CorrelationOutput.r");
+source("linear_regression.r"); 
+source("time_series.r"); 
+source("neural_network_stable.r"); 
+source("neural_network_3_to_1.r");
+source("anfis.r"); 
+source("new_ytdp.r"); 
+library(httr)
+GET("http://httpbin.org/get")

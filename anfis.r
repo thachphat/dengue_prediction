@@ -1,6 +1,6 @@
 require("e1071")
 require("neuralnet")
-source("D:\\db.R")
+source("db.R")
 init()
 
 STATIC_MF <- 0.5

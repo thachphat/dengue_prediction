@@ -5,7 +5,7 @@ getDB <- function() {
     drv <- dbDriver("PostgreSQL")
     con <- dbConnect(drv, dbname = "yteduphong",
                      host = "localhost", port = 5432,
-                     user = "pncuong", pass = "PG@2014")
+                     user = "postgres", pass = "PG@2014")
 }
 
 getData <- function() {
