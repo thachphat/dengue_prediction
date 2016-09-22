@@ -6,4 +6,4 @@ source("neural_network_3_to_1.r");
 source("anfis.r"); 
 source("new_ytdp.r"); 
 library(httr)
-GET("http://httpbin.org/get")
+GET("localhost/finish")
